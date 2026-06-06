@@ -21,7 +21,8 @@ export default function Home() {
     const logged = localStorage.getItem("wiq_logged_in");
     if (logged === "true") {
       setIsLoggedIn(true);
-      fetchCases();
+      // Immediately seed Enron case and fetch
+      seedEnronCaseDirectly();
     } else {
       setLoading(false);
     }
@@ -48,26 +49,25 @@ export default function Home() {
     try {
       const res = await fetch("/api/cases");
       if (!res.ok) throw new Error("Failed to fetch cases");
-      let data = await res.json();
+      const data = await res.json();
+      setCases(data);
+    } catch (err: any) {
+      setError("Failed to connect to server. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const seedEnronCaseDirectly = async () => {
+    setLoading(true);
+    try {
+      // Seed Enron case asynchronously in background
+      fetch("/api/cases/load-enron", { method: "POST" }).catch(err => console.log("Enron seed attempted"));
       
-      // Check if Enron case exists
-      const hasEnron = data.some((c: any) => c.title.includes("Enron"));
-      
-      // If Enron case doesn't exist, automatically load it
-      if (!hasEnron) {
-        try {
-          const enronRes = await fetch("/api/cases/load-enron", {
-            method: "POST"
-          });
-          if (enronRes.ok) {
-            const enronCase = await enronRes.json();
-            data = [enronCase, ...data];
-          }
-        } catch (err) {
-          console.log("Enron case auto-load skipped");
-        }
-      }
-      
+      // Fetch cases immediately without waiting
+      const res = await fetch("/api/cases");
+      if (!res.ok) throw new Error("Failed to fetch cases");
+      const data = await res.json();
       setCases(data);
     } catch (err: any) {
       setError("Failed to connect to server. Please try again.");
