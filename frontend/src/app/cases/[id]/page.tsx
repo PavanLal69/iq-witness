@@ -6,6 +6,7 @@ import {
   Shield, ArrowLeft, Loader2, Upload, FileText, Video, Music, MessageSquare, 
   Network, Download, RefreshCw, AlertCircle, FileCheck, Layers
 } from "lucide-react";
+import { getCase, getTimeline, getEntities, getRelationships } from "@/lib/firestore";
 
 export default function CaseDetail() {
   const params = useParams();
@@ -164,32 +165,51 @@ export default function CaseDetail() {
   const fetchCaseData = async () => {
     setLoading(true);
     try {
-      const resCase = await fetch(`/api/cases/${caseId}`);
-      if (!resCase.ok) throw new Error("Case not found");
-      const details = await resCase.json();
+      // Fetch from Firebase directly (much faster)
+      const caseData = await getCase(caseId as string);
+      if (!caseData) throw new Error("Case not found");
+      
       setCaseDetails({
-        ...details,
-        evidence: details.evidence || []
+        id: caseData.id,
+        title: caseData.title,
+        description: caseData.description || "",
+        status: caseData.status,
+        created_at: caseData.created_at,
+        updated_at: caseData.updated_at,
+        evidence: [] // Firebase doesn't store evidence directly, will be fetched separately
       });
 
-      const resTimeline = await fetch(`/api/cases/${caseId}/timeline`);
-      let timelineData = [];
-      if (resTimeline.ok) {
-        timelineData = await resTimeline.json();
-      }
+      // Fetch timeline events from Firebase
+      const timelineData = await getTimeline(caseId as string);
       setTimeline(Array.isArray(timelineData) ? timelineData : []);
 
-      const resGraph = await fetch(`/api/cases/${caseId}/entities`);
-      let gData = { nodes: [], links: [] };
-      if (resGraph.ok) {
-        gData = await resGraph.json();
-      }
-      setGraphData(gData || { nodes: [], links: [] });
-
-      updateGraphPositions(gData?.nodes || [], gData?.links || []);
+      // Fetch entities from Firebase
+      const entitiesData = await getEntities(caseId as string);
+      
+      // Fetch relationships
+      const relationshipsData = await getRelationships(caseId as string);
+      
+      // Build graph data from entities and relationships
+      const gData = {
+        nodes: entitiesData.map((e: any) => ({
+          id: e.id,
+          label: e.name,
+          type: e.type,
+          details: e.details
+        })),
+        links: relationshipsData.map((r: any) => ({
+          id: r.id,
+          source: r.source_id,
+          target: r.target_id,
+          label: r.relation_type
+        }))
+      };
+      
+      setGraphData(gData);
+      updateGraphPositions(gData.nodes, gData.links);
 
     } catch (err) {
-      console.error("Error fetching case data:", err);
+      console.error("Error fetching case data from Firebase:", err);
       setTimeline([]);
       setGraphData({ nodes: [], links: [] });
       setNodes([]);
