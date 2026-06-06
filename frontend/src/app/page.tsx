@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Shield, Lock, AlertTriangle, Cpu, FolderOpen, Plus, Trash2, ArrowRight, Layers, Loader2 } from "lucide-react";
+import { deleteCase, getCases } from "@/lib/firestore";
 
 export default function Home() {
   const router = useRouter();
@@ -47,12 +48,35 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/cases");
-      if (!res.ok) throw new Error("Failed to fetch cases");
-      const data = await res.json();
-      setCases(data);
+      // Get Firebase cases
+      const firebaseCases = await getCases();
+      
+      // Try to get backend cases as well
+      let backendCases: any[] = [];
+      try {
+        const res = await fetch("/api/cases");
+        if (res.ok) {
+          backendCases = await res.json();
+        }
+      } catch (_) {
+        // Backend not available, just use Firebase cases
+      }
+
+      // Combine cases from both sources (Firebase cases first)
+      const allCases = [
+        ...firebaseCases.map(c => ({
+          ...c,
+          id: c.id, // Firebase IDs are strings
+          created_at: c.created_at || new Date().toISOString(),
+          updated_at: c.updated_at || new Date().toISOString()
+        })),
+        ...backendCases.filter(bc => !firebaseCases.some(fc => fc.id === String(bc.id)))
+      ];
+
+      setCases(allCases);
     } catch (err: any) {
-      setError("Failed to connect to server. Please try again.");
+      console.error("Error fetching cases:", err);
+      setError("Failed to load cases. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -102,17 +126,29 @@ export default function Home() {
     }
   };
 
-  const handleDeleteCase = async (id: number, e: React.MouseEvent) => {
+  const handleDeleteCase = async (id: string | number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm("Confirm permanent deletion of this case and all associated evidence?")) return;
 
     try {
+      // Try Firebase first (for cases loaded from Firebase)
+      try {
+        await deleteCase(String(id));
+        fetchCases();
+        return;
+      } catch (firebaseErr) {
+        // If Firebase fails, try backend API
+        console.log("Firebase delete failed, trying backend API...");
+      }
+
+      // Fallback to backend API
       const res = await fetch(`/api/cases/${id}`, {
         method: "DELETE"
       });
       if (!res.ok) throw new Error("Delete failed");
       fetchCases();
     } catch (err) {
+      console.error("Error deleting case:", err);
       alert("Failed to delete case.");
     }
   };
