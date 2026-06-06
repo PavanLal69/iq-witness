@@ -167,17 +167,20 @@ export default function CaseDetail() {
       const resCase = await fetch(`/api/cases/${caseId}`);
       if (!resCase.ok) throw new Error("Case not found");
       const details = await resCase.json();
-      setCaseDetails(details);
+      setCaseDetails({
+        ...details,
+        evidence: details.evidence || []
+      });
 
       const resTimeline = await fetch(`/api/cases/${caseId}/timeline`);
       const timelineData = await resTimeline.json();
-      setTimeline(timelineData);
+      setTimeline(Array.isArray(timelineData) ? timelineData : []);
 
       const resGraph = await fetch(`/api/cases/${caseId}/entities`);
       const gData = await resGraph.json();
-      setGraphData(gData);
+      setGraphData(gData || { nodes: [], links: [] });
 
-      updateGraphPositions(gData.nodes, gData.links);
+      updateGraphPositions(gData?.nodes || [], gData?.links || []);
 
     } catch (err) {
       console.error(err);
