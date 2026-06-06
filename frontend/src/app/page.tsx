@@ -16,7 +16,6 @@ export default function Home() {
   const [newDesc, setNewDesc] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [isSeeding, setIsSeeding] = useState(false);
-  const [isLoadingEnron, setIsLoadingEnron] = useState(false);
 
   useEffect(() => {
     const logged = localStorage.getItem("wiq_logged_in");
@@ -49,7 +48,26 @@ export default function Home() {
     try {
       const res = await fetch("/api/cases");
       if (!res.ok) throw new Error("Failed to fetch cases");
-      const data = await res.json();
+      let data = await res.json();
+      
+      // Check if Enron case exists
+      const hasEnron = data.some((c: any) => c.title.includes("Enron"));
+      
+      // If Enron case doesn't exist, automatically load it
+      if (!hasEnron) {
+        try {
+          const enronRes = await fetch("/api/cases/load-enron", {
+            method: "POST"
+          });
+          if (enronRes.ok) {
+            const enronCase = await enronRes.json();
+            data = [enronCase, ...data];
+          }
+        } catch (err) {
+          console.log("Enron case auto-load skipped");
+        }
+      }
+      
       setCases(data);
     } catch (err: any) {
       setError("Failed to connect to server. Please try again.");
@@ -112,22 +130,6 @@ export default function Home() {
       alert("Failed to seed demo case. Is the backend running?");
     } finally {
       setIsSeeding(false);
-    }
-  };
-
-  const handleLoadEnron = async () => {
-    setIsLoadingEnron(true);
-    try {
-      const res = await fetch("/api/cases/load-enron", {
-        method: "POST"
-      });
-      if (!res.ok) throw new Error("Enron load failed");
-      const data = await res.json();
-      router.push(`/cases/${data.id}`);
-    } catch (err) {
-      alert("Failed to seed Enron case.");
-    } finally {
-      setIsLoadingEnron(false);
     }
   };
 
@@ -267,14 +269,6 @@ export default function Home() {
             >
               <Cpu className={`h-3.5 w-3.5 text-brand-light ${isSeeding ? 'animate-spin' : ''}`} />
               <span>{isSeeding ? "Analyzing..." : "Seed Case Simulation"}</span>
-            </button>
-            <button
-              onClick={handleLoadEnron}
-              disabled={isLoadingEnron}
-              className="flex items-center space-x-1.5 bg-card-bg hover:bg-zinc-800 border border-card-border text-zinc-300 font-semibold text-xs px-3.5 py-1.5 rounded transition-all cursor-pointer"
-            >
-              <Cpu className={`h-3.5 w-3.5 text-brand-light ${isLoadingEnron ? 'animate-spin' : ''}`} />
-              <span>{isLoadingEnron ? "Loading..." : "Load Enron Case"}</span>
             </button>
             <button
               onClick={() => setShowModal(true)}
