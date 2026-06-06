@@ -1,0 +1,39 @@
+# Python backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.db
+*.sqlite3
+backend/storage/
+backend/.env
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+.cache/
+dist/
+build/
+out/
+
+# Environment secrets — NEVER commit these
+*.env.local
+*.env.production
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vercel
+.vercel/
