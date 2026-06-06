@@ -173,24 +173,39 @@ export default function CaseDetail() {
       });
 
       const resTimeline = await fetch(`/api/cases/${caseId}/timeline`);
-      const timelineData = await resTimeline.json();
+      let timelineData = [];
+      if (resTimeline.ok) {
+        timelineData = await resTimeline.json();
+      }
       setTimeline(Array.isArray(timelineData) ? timelineData : []);
 
       const resGraph = await fetch(`/api/cases/${caseId}/entities`);
-      const gData = await resGraph.json();
+      let gData = { nodes: [], links: [] };
+      if (resGraph.ok) {
+        gData = await resGraph.json();
+      }
       setGraphData(gData || { nodes: [], links: [] });
 
       updateGraphPositions(gData?.nodes || [], gData?.links || []);
 
     } catch (err) {
-      console.error(err);
-      router.push("/");
+      console.error("Error fetching case data:", err);
+      setTimeline([]);
+      setGraphData({ nodes: [], links: [] });
+      setNodes([]);
+      setLinks([]);
     } finally {
       setLoading(false);
     }
   };
 
   const updateGraphPositions = (rawNodes: any[], rawLinks: any[]) => {
+    if (!Array.isArray(rawNodes) || !Array.isArray(rawLinks)) {
+      setNodes([]);
+      setLinks([]);
+      return;
+    }
+
     const width = 900;
     const height = 500;
     setNodes(prevNodes => {
@@ -206,7 +221,7 @@ export default function CaseDetail() {
         }
       });
     });
-    setLinks(rawLinks);
+    setLinks(rawLinks || []);
   };
 
   const handleProcessEvidence = async () => {
